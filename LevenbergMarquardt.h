@@ -16,7 +16,7 @@ public:
 
 	LevenbergMarquardt() :
 		tau(10e-3), e1(10e-15), e2(10e-15), e3(10e-15),
-		damping(20.0), maxIterations(450) { }
+		damping(2.0), maxIterations(100) { }
 	
 	Eigen::VectorXd operator()(Eigen::VectorXd initialGuess, Eigen::VectorXd x, std::function<Eigen::VectorXd(Eigen::VectorXd)> func) {
 		double v = damping; // Damping.
