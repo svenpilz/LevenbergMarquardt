@@ -2,12 +2,36 @@
 #define	LEVENBERGMARQUARDT_H
 
 /*
- * Based on the paper “A Brief Description of the Levenberg-Marquardt Algorithm Implemented by levmar” by Manolis I. A. Lourakis.
+ * A header-only implementation of Levenberg-Marquardt least squares optimization
+ * with Eigen3. Based on the paper “A Brief Description of the Levenberg-Marquardt
+ * Algorithm Implemented by levmar” by Manolis I. A. Lourakis.
+ *
+ *
+ * The MIT License (MIT)
+ * Copyright (c) 2014 Sven-Kristofer Pilz
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #include <stdexcept>
-#include <limits>
 #include <functional>
+
 #include <Eigen/Dense>
 
 class LevenbergMarquardt {
@@ -18,18 +42,20 @@ public:
 		tau(10e-3), e1(10e-15), e2(10e-15), e3(10e-15),
 		damping(2.0), maxIterations(100) { }
 	
-	Eigen::VectorXd operator()(Eigen::VectorXd initialGuess, Eigen::VectorXd x, std::function<Eigen::VectorXd(Eigen::VectorXd)> func) {
-		double v = damping; // Damping.
+	Eigen::VectorXd operator()(Eigen::VectorXd initialGuess, Eigen::VectorXd targetValue,
+		std::function<Eigen::VectorXd(Eigen::VectorXd)> func) {
+		
+		double v = damping;
 		auto p = initialGuess;
-		auto J = LevenbergMarquardt::jacobi(func, p, initialGuess.rows(), x.rows());
+		auto J = LevenbergMarquardt::jacobi(func, p, initialGuess.rows(), targetValue.rows());
 		Eigen::MatrixXd A = J.transpose() * J;
-		Eigen::VectorXd error = x - func(p);
+		Eigen::VectorXd error = targetValue - func(p);
 		Eigen::MatrixXd g = J.transpose() * error;
 		bool stop = g.cwiseAbs().maxCoeff() <= e1;
 		double u = tau * A.diagonal().maxCoeff();
 		const auto I = Eigen::MatrixXd::Identity(A.rows(), A.cols());
 
-		for (int k = 0; k < maxIterations && !stop; k++) {
+		for (unsigned int k = 0; k < maxIterations && !stop; ++k) {
 			double rho = 0;
 			
 			do {
@@ -37,18 +63,17 @@ public:
 				
 				if (delta.norm() <= e2*p.norm()) {
 					stop = true;
-					
 				} else {
 					Eigen::VectorXd newGuess = p + delta;
 					Eigen::VectorXd newValue = func(newGuess);
-					rho = error.norm()*error.norm() - (x - newValue).norm()*(x - newValue).norm();
+					rho = error.norm()*error.norm() - (targetValue - newValue).norm()*(targetValue - newValue).norm();
 					rho /= (delta.transpose() * (u*delta+g))[0];
 					
 					if (rho > 0) {
 						p = newGuess;
-						J = LevenbergMarquardt::jacobi(func, p, p.rows(), x.rows());
+						J = LevenbergMarquardt::jacobi(func, p, p.rows(), targetValue.rows());
 						A = J.transpose() * J;
-						error = x - newValue;
+						error = targetValue - newValue;
 						g = J.transpose() * error;
 						stop = g.cwiseAbs().maxCoeff() <= e1 || error.norm()*error.norm() <= e3; // max(g) <= e1 OR length(error)^2 <= e3
 						
@@ -98,7 +123,7 @@ private:
 	double e2;
 	double e3;	
 	double damping;
-	int maxIterations;
+	unsigned int maxIterations;
 };
 
 #endif	/* LEVENBERGMARQUARDT_H */
